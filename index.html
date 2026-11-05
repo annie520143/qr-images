@@ -61,8 +61,12 @@
     setViewportHeight();
     window.addEventListener('resize', setViewportHeight);
 
-    const imageName = new URLSearchParams(location.search).get('n');
-    document.getElementById('p').src = 'img/' + imageName + '.png';
+    const requestedNumber = Number.parseInt(new URLSearchParams(location.search).get('n'), 10);
+    const imageNumber = Number.isInteger(requestedNumber) && requestedNumber >= 1 && requestedNumber <= 16
+      ? requestedNumber
+      : 1;
+    const imageName = String(imageNumber).padStart(2, '0');
+    document.getElementById('p').src = 'img/人物風格圖-05-' + imageName + '.png';
   </script>
 </body>
 </html>
