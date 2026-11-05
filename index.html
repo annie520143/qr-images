@@ -49,7 +49,6 @@
       max-height: 90vh;
       max-height: 90dvh;
       object-fit: contain;
-      filter: drop-shadow(3px 2px 4.3px rgba(0, 0, 0, 0.25));
     }
 
     .composite {
@@ -65,7 +64,17 @@
       -webkit-touch-callout: default;
     }
 
-    .composite.ready {
+    .composite-canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      display: none;
+      width: 100%;
+      height: var(--viewport-height);
+    }
+
+    .composite.ready,
+    .composite-canvas.ready {
       display: block;
     }
 
@@ -90,6 +99,7 @@
   <div class="foreground">
     <img id="p" alt="">
   </div>
+  <canvas id="compositeCanvas" class="composite-canvas" aria-label=""></canvas>
   <img id="composite" class="composite" alt="">
   <button id="download" type="button">下載圖片</button>
 
@@ -97,6 +107,7 @@
     const backgroundSrc = 'img/BACKGROUND.png';
     const foreground = document.querySelector('.foreground');
     const foregroundImage = document.getElementById('p');
+    const compositeCanvas = document.getElementById('compositeCanvas');
     const composite = document.getElementById('composite');
 
     function setViewportHeight() {
@@ -112,25 +123,29 @@
       });
     }
 
-    function drawCover(context, image, width, height) {
+    function drawCover(context, image, width, height, pixelRatio) {
       const scale = Math.max(width / image.naturalWidth, height / image.naturalHeight);
-      const drawWidth = image.naturalWidth * scale;
-      const drawHeight = image.naturalHeight * scale;
-      context.drawImage(image, (width - drawWidth) / 2, (height - drawHeight) / 2, drawWidth, drawHeight);
+      const drawWidth = image.naturalWidth * scale * pixelRatio;
+      const drawHeight = image.naturalHeight * scale * pixelRatio;
+      const x = ((width - image.naturalWidth * scale) / 2) * pixelRatio;
+      const y = ((height - image.naturalHeight * scale) / 2) * pixelRatio;
+      context.drawImage(image, x, y, drawWidth, drawHeight);
     }
 
-    function drawForeground(context, image, width, height) {
+    function drawForeground(context, image, width, height, pixelRatio) {
       const scale = Math.min(1, (width * 0.8) / image.naturalWidth, (height * 0.9) / image.naturalHeight);
-      const drawWidth = image.naturalWidth * scale;
-      const drawHeight = image.naturalHeight * scale;
-      const x = (width - drawWidth) / 2;
-      const y = (height - drawHeight) / 2;
+      const cssWidth = image.naturalWidth * scale;
+      const cssHeight = image.naturalHeight * scale;
+      const drawWidth = cssWidth * pixelRatio;
+      const drawHeight = cssHeight * pixelRatio;
+      const x = ((width - cssWidth) / 2) * pixelRatio;
+      const y = ((height - cssHeight) / 2) * pixelRatio;
 
       context.save();
       context.shadowColor = 'rgba(0, 0, 0, 0.25)';
-      context.shadowOffsetX = 3;
-      context.shadowOffsetY = 2;
-      context.shadowBlur = 4.3;
+      context.shadowOffsetX = 3 * pixelRatio;
+      context.shadowOffsetY = 2 * pixelRatio;
+      context.shadowBlur = 4.3 * pixelRatio;
       context.drawImage(image, x, y, drawWidth, drawHeight);
       context.restore();
     }
@@ -150,27 +165,31 @@
         const images = await Promise.all([loadImage(backgroundSrc), loadImage(foregroundSrc)]);
         const width = window.innerWidth;
         const height = window.innerHeight;
-        const scale = Math.min(window.devicePixelRatio || 1, 3);
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.round(width * scale);
-        canvas.height = Math.round(height * scale);
-        const context = canvas.getContext('2d');
-        context.scale(scale, scale);
-        drawCover(context, images[0], width, height);
-        drawForeground(context, images[1], width, height);
+        const pixelRatio = Math.min(window.devicePixelRatio || 1, 3);
+        compositeCanvas.width = Math.round(width * pixelRatio);
+        compositeCanvas.height = Math.round(height * pixelRatio);
+        const context = compositeCanvas.getContext('2d');
+        drawCover(context, images[0], width, height, pixelRatio);
+        drawForeground(context, images[1], width, height, pixelRatio);
 
-        const compositeReady = new Promise((resolve, reject) => {
-          composite.onload = resolve;
-          composite.onerror = reject;
-        });
-        composite.src = canvas.toDataURL('image/png');
-        await compositeReady;
         document.querySelector('.background').style.display = 'none';
         foreground.style.display = 'none';
-        composite.classList.add('ready');
+        compositeCanvas.classList.add('ready');
+
+        try {
+          const compositeReady = new Promise((resolve, reject) => {
+            composite.onload = resolve;
+            composite.onerror = reject;
+          });
+          composite.src = compositeCanvas.toDataURL('image/png');
+          await compositeReady;
+          composite.classList.add('ready');
+          compositeCanvas.classList.remove('ready');
+        } catch (exportError) {
+          console.info('Canvas export is unavailable; displaying the same canvas directly.', exportError);
+        }
       } catch (error) {
-        foregroundImage.src = foregroundSrc;
-        foreground.classList.add('ready');
+        console.error('Unable to load images for the canvas composition.', error);
       }
     }
 
