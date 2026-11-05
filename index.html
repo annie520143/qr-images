@@ -201,7 +201,6 @@
     const foreground = document.querySelector('.foreground');
     const foregroundImage = document.getElementById('p');
     const composite = document.getElementById('composite');
-    const downloadButton = { addEventListener() {} };
 
     function setViewportHeight() {
       document.documentElement.style.setProperty('--viewport-height', window.innerHeight + 'px');
@@ -249,42 +248,7 @@
     const imageName = String(imageNumber).padStart(2, '0');
     const foregroundSrc = 'img/\u4eba\u7269\u98a8\u683c\u5716-05-' + imageName + '.png';
 
-    foregroundImage.onload = async () => {
-      if (foregroundImage.decode) {
-        try {
-          await foregroundImage.decode();
-        } catch (error) {
-          // The image can still be displayed when decode is unavailable.
-        }
-      }
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => foreground.classList.add('ready'));
-      });
-    };
-    foregroundImage.src = foregroundSrc;
-
-    Promise.all([loadImage(backgroundSrc), loadImage(foregroundSrc)]).then((images) => {
-      const width = window.innerWidth;
-      const height = window.innerHeight;
-      const scale = Math.min(window.devicePixelRatio || 1, 3);
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.round(width * scale);
-      canvas.height = Math.round(height * scale);
-      const context = canvas.getContext('2d');
-      context.scale(scale, scale);
-      drawCover(context, images[0], width, height);
-      drawForeground(context, images[1], width, height);
-      composite.src = canvas.toDataURL('image/png');
-      composite.onload = () => {
-        document.querySelector('.background').style.display = 'none';
-        foreground.style.display = 'none';
-        composite.classList.add('ready');
-      };
-    });
-
-    downloadButton.addEventListener('click', async () => {
-      downloadButton.disabled = true;
-      downloadButton.textContent = 'Preparing...';
+    async function buildComposite() {
       try {
         const images = await Promise.all([loadImage(backgroundSrc), loadImage(foregroundSrc)]);
         const width = window.innerWidth;
@@ -297,20 +261,24 @@
         context.scale(scale, scale);
         drawCover(context, images[0], width, height);
         drawForeground(context, images[1], width, height);
-        canvas.toBlob((blob) => {
-          const link = document.createElement('a');
-          link.href = URL.createObjectURL(blob);
-          link.download = 'portrait-' + imageName + '.png';
-          link.click();
-          URL.revokeObjectURL(link.href);
-        }, 'image/png');
+
+        const compositeReady = new Promise((resolve, reject) => {
+          composite.onload = resolve;
+          composite.onerror = reject;
+        });
+        composite.src = canvas.toDataURL('image/png');
+        await compositeReady;
+        document.querySelector('.background').style.display = 'none';
+        foreground.style.display = 'none';
+        composite.classList.add('ready');
       } catch (error) {
-        alert('Image loading failed. Download is temporarily unavailable.');
-      } finally {
-        downloadButton.disabled = false;
-        downloadButton.textContent = 'Download';
+        foregroundImage.src = foregroundSrc;
+        foreground.classList.add('ready');
       }
-    });
+    }
+
+    buildComposite();
+
   </script>
 </body>
 </html>
