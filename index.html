@@ -58,7 +58,7 @@
       display: none;
       width: 100%;
       height: var(--viewport-height);
-      object-fit: fill;
+      object-fit: cover;
       user-select: none;
       -webkit-user-select: none;
       -webkit-touch-callout: default;
@@ -71,6 +71,7 @@
       display: none;
       width: 100%;
       height: var(--viewport-height);
+      object-fit: cover;
     }
 
     .composite.ready,
@@ -151,7 +152,6 @@
     }
 
     setViewportHeight();
-    window.addEventListener('resize', setViewportHeight);
 
     const requestedNumber = Number.parseInt(new URLSearchParams(location.search).get('n'), 10);
     const imageNumber = Number.isInteger(requestedNumber) && requestedNumber >= 1 && requestedNumber <= 16
@@ -160,9 +160,15 @@
     const imageName = String(imageNumber).padStart(2, '0');
     const foregroundSrc = 'img/\u4eba\u7269\u98a8\u683c\u5716-05-' + imageName + '.png';
 
+    let renderVersion = 0;
+
     async function buildComposite() {
+      const currentVersion = ++renderVersion;
+
       try {
         const images = await Promise.all([loadImage(backgroundSrc), loadImage(foregroundSrc)]);
+        if (currentVersion !== renderVersion) return;
+
         const width = window.innerWidth;
         const height = window.innerHeight;
         const pixelRatio = Math.min(window.devicePixelRatio || 1, 3);
@@ -183,6 +189,8 @@
           });
           composite.src = compositeCanvas.toDataURL('image/png');
           await compositeReady;
+          if (currentVersion !== renderVersion) return;
+
           composite.classList.add('ready');
           compositeCanvas.classList.remove('ready');
         } catch (exportError) {
@@ -192,6 +200,13 @@
         console.error('Unable to load images for the canvas composition.', error);
       }
     }
+
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+      setViewportHeight();
+      window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(buildComposite, 120);
+    });
 
     buildComposite();
 
