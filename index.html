@@ -154,7 +154,7 @@
     setViewportHeight();
 
     const requestedNumber = Number.parseInt(new URLSearchParams(location.search).get('n'), 10);
-    const imageNumber = Number.isInteger(requestedNumber) && requestedNumber >= 1 && requestedNumber <= 16
+    const imageNumber = Number.isInteger(requestedNumber) && requestedNumber >= 1 && requestedNumber <= 18
       ? requestedNumber
       : 1;
     const imageName = String(imageNumber).padStart(2, '0');
